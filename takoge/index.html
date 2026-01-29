@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fantasy Pixel Quest</title>
+    <style>
+        :root {
+            --bg-color: #202020;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: white;
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #game-container {
+            position: relative;
+            background-color: #000;
+            
+            /* アスペクト比 4:3 (512:384) を維持して画面にフィット */
+            width: min(95vw, calc(80vh * 4 / 3));
+            height: min(80vh, calc(95vw * 3 / 4));
+            
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            border: 2px solid #444;
+            border-radius: 4px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        #mobile-controls {
+            display: none;
+            margin-top: 15px;
+            gap: 15px;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+        .d-pad {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px;
+            gap: 4px;
+        }
+        .btn {
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 4px 0 #222;
+        }
+        .btn:active {
+            box-shadow: 0 0 0 #222;
+            transform: translateY(4px);
+            background: #444;
+        }
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        
+        .action-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: #f58b8b;
+            border: 3px solid #b05151;
+            margin-left: 30px;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 0 #3d1515;
+        }
+        .action-btn:active {
+            box-shadow: 0 0 0 #3d1515;
+            transform: translateY(4px);
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            #mobile-controls {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="512" height="384"></canvas>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="d-pad">
+            <div class="btn btn-up" id="btn-up">▲</div>
+            <div class="btn btn-left" id="btn-left">◀</div>
+            <div class="btn btn-down" id="btn-down">▼</div>
+            <div class="btn btn-right" id="btn-right">▶</div>
+        </div>
+        <div class="btn action-btn" id="btn-action">WAIT</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const TILE_SIZE = 16; 
+        const ZOOM = 2; 
+        const MAP_WIDTH = 32;
+        const MAP_HEIGHT = 24;
+        
+        // 色の定義 (他のスプライト用)
+        const COLORS = {
+            Black: '#000000', 
+            White: '#FFFFFF',
+            Shadow: '#2e2e2e',
+            SkyBlue: '#6b8cff',
+            Grass: '#66cc66', 
+            DarkGreen: '#009900',
+            Red: '#ff4444',
+            Brown: '#8B4513',
+            LightBrown: '#cd853f',
+            Gold: '#FFD700',
+            Grey: '#808080'
+        };
+
+        const CHAR_MAP = {
+            '.': null,              
+            '#': COLORS.Black,      
+            'w': COLORS.White,      
+            'r': COLORS.Red,
+            'g': COLORS.Grass,
+            'G': COLORS.DarkGreen,
+            'b': COLORS.Brown,
+            'B': COLORS.LightBrown,
+            'y': COLORS.Gold,
+            's': COLORS.Grey,
+            'S': COLORS.Shadow
+        };
+
+        const SPRITES = {
+            // プレイヤー (ピンク)
+            player: [
+                [null, null, null, null, null, '#3d1515', '#281717', '#000000', '#000000', '#281717', '#3d1515', null, null, null, null, null],
+                ['#3a2d2d', null, null, null, '#000000', '#f58b8b', '#f58b8b', '#f58b8b', '#fc9696', '#ffa0a0', '#ffa0a0', '#000000', null, null, null, null],
+                ['#000000', '#3a2d2d', null, '#000000', '#b05151', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#ffc8c8', '#ffa0a0', '#000000', null, null, null],
+                ['#000000', '#ffc8c8', '#000000', '#a63939', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#ffa0a0', '#000000', null, null],
+                ['#000000', '#ffa0a0', '#000000', '#f58b8b', '#000000', '#ffdbdb', '#f58b8b', '#f58b8b', '#f58b8b', '#ffdbdb', '#000000', '#f58b8b', '#fc9696', '#000000', null, null],
+                ['#000000', '#ffa0a0', '#000000', '#f58b8b', '#000000', '#000000', '#f58b8b', '#f58b8b', '#f58b8b', '#000000', '#000000', '#f58b8b', '#f58b8b', '#000000', '#000000', null],
+                ['#000000', '#ffb2b2', '#000000', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#000000', '#fc9696', '#000000'],
+                ['#3a2d2d', '#ffb2b2', '#000000', '#f58b8b', '#f58b8b', '#b05151', '#f58b8b', '#f58b8b', '#f58b8b', '#b05151', '#f58b8b', '#f58b8b', '#eb7171', '#000000', '#fc9696', '#000000'],
+                ['#3a2d2d', '#ffb2b2', '#000000', '#000000', '#fc9696', '#eb7171', '#a63939', '#b05151', '#a63939', '#eb7171', '#f58b8b', '#fc9696', '#000000', '#eb7171', '#fc9696', '#000000'],
+                ['#3a2d2d', '#ffb2b2', '#000000', '#000000', '#fc9696', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#eb7171', '#000000', '#fc9696', '#fc9696', '#000000'],
+                ['#3a2d2d', '#f58b8b', '#000000', null, '#000000', '#eb7171', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#eb7171', '#000000', '#fc9696', '#fc9696', '#7e5656', '#000000'],
+                ['#3a2d2d', '#f58b8b', '#000000', null, null, '#000000', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#000000', '#000000', '#fc9696', '#fc9696', '#000000', null],
+                ['#000000', '#f58b8b', '#000000', null, null, '#000000', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#000000', null, '#000000', '#fc9696', '#000000', '#7e5656'],
+                ['#000000', '#eb7171', '#ffa0a0', '#000000', '#000000', '#b05151', '#f58b8b', '#000000', '#f58b8b', '#f58b8b', '#a63939', '#000000', '#000000', '#ffc8c8', '#ffc8c8', '#000000'],
+                [null, '#000000', '#eb7171', '#f58b8b', '#f58b8b', '#f58b8b', '#000000', null, '#000000', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#f58b8b', '#ffa0a0', '#000000'],
+                [null, null, '#000000', '#000000', '#000000', '#000000', null, null, null, '#000000', '#000000', '#000000', '#000000', '#000000', '#000000', null]
+            ],
+            // 敵 (黄色いキャラ)
+            enemy: [
+                [null, null, null, null, null, '#3d3d15', '#282817', '#000000', '#000000', '#282817', '#3d3d15', null, null, null, null, null],
+                ['#3a3a2d', null, null, null, '#000000', '#f5f58b', '#f5f58b', '#f5f58b', '#fcfc96', '#ffffa0', '#ffffa0', '#000000', null, null, null, null],
+                ['#000000', '#3a3a2d', null, '#000000', '#b0b051', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#ffffc8', '#ffffa0', '#000000', null, null, null],
+                ['#000000', '#ffffc8', '#000000', '#a6a639', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#ffffa0', '#000000', null, null],
+                ['#000000', '#ffffa0', '#000000', '#f5f58b', '#000000', '#ffffdb', '#f5f58b', '#f5f58b', '#f5f58b', '#ffffdb', '#000000', '#f5f58b', '#fcfc96', '#000000', null, null],
+                ['#000000', '#ffffa0', '#000000', '#f5f58b', '#000000', '#000000', '#f5f58b', '#f5f58b', '#f5f58b', '#000000', '#000000', '#f5f58b', '#f5f58b', '#000000', '#000000', null],
+                ['#000000', '#ffffb2', '#000000', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#000000', '#fcfc96', '#000000'],
+                ['#3a3a2d', '#ffffb2', '#000000', '#f5f58b', '#f5f58b', '#b0b051', '#f5f58b', '#f5f58b', '#f5f58b', '#b0b051', '#f5f58b', '#f5f58b', '#ebeb71', '#000000', '#fcfc96', '#000000'],
+                ['#3a3a2d', '#ffffb2', '#000000', '#000000', '#fcfc96', '#ebeb71', '#a6a639', '#b0b051', '#a6a639', '#ebeb71', '#f5f58b', '#fcfc96', '#000000', '#ebeb71', '#fcfc96', '#000000'],
+                ['#3a3a2d', '#ffffb2', '#000000', '#000000', '#fcfc96', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#ebeb71', '#000000', '#fcfc96', '#fcfc96', '#000000'],
+                ['#3a3a2d', '#f5f58b', '#000000', null, '#000000', '#ebeb71', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#ebeb71', '#000000', '#fcfc96', '#fcfc96', '#7e7e56', '#000000'],
+                ['#3a3a2d', '#f5f58b', '#000000', null, null, '#000000', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#000000', '#000000', '#fcfc96', '#fcfc96', '#000000', null],
+                ['#000000', '#f5f58b', '#000000', null, null, '#000000', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#000000', null, '#000000', '#fcfc96', '#000000', '#7e7e56'],
+                ['#000000', '#ebeb71', '#ffffa0', '#000000', '#000000', '#b0b051', '#f5f58b', '#000000', '#f5f58b', '#f5f58b', '#a6a639', '#000000', '#000000', '#ffffc8', '#ffffc8', '#000000'],
+                [null, '#000000', '#ebeb71', '#f5f58b', '#f5f58b', '#f5f58b', '#000000', null, '#000000', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#f5f58b', '#ffffa0', '#000000'],
+                [null, null, '#000000', '#000000', '#000000', '#000000', null, null, null, '#000000', '#000000', '#000000', '#000000', '#000000', '#000000', null]
+            ],
+            // 壁 (レンガ)
+            wall: [
+                "bbbbbbbbbbbbbbbb",
+                "bBbB B B bBbB B ",
+                "bB B B B bB B B ",
+                "bBbB B B bBbB B ",
+                "bbbbbbbbbbbbbbbb",
+                "B B bBbB B B bBb",
+                "B B bB B B B bBb",
+                "B B bBbB B B bBb",
+                "bbbbbbbbbbbbbbbb",
+                "bBbB B B bBbB B ",
+                "bB B B B bB B B ",
+                "bBbB B B bBbB B ",
+                "bbbbbbbbbbbbbbbb",
+                "B B bBbB B B bBb",
+                "B B bB B B B bBb",
+                "B B bBbB B B bBb"
+            ],
+            // 床 (草)
+            floor: [
+                "gggggggggggggggg",
+                "gggGgggggggGgggg",
+                "gggGgggggggGgggg",
+                "gggggggggggggggg",
+                "ggggggGggggggggg",
+                "ggggggGggggggggg",
+                "gggggggggggggggg",
+                "ggggggggggGggggg",
+                "ggggggggggGggggg",
+                "gggggggggggggggg",
+                "gggGgggggggggggg",
+                "gggGgggggggggggg",
+                "gggggggggggggggg",
+                "ggggggggGggggggg",
+                "ggggggggGggggggg",
+                "gggggggggggggggg"
+            ],
+            // 階段 (ゴール)
+            stairs: [
+                "................",
+                "..ssssssssssss..",
+                ".s############s.",
+                ".s############s.",
+                ".s############s.",
+                ".s############s.",
+                ".ssssssssssssss.",
+                "..bbbbbbbbbbbb..",
+                "..bbbbbbbbbbbb..",
+                "..bbbbbbbbbbbb..",
+                "..bbbbbbbbbbbb..",
+                "..bbbbbbbbbbbb..",
+                "..bbbbbbbbbbbb..",
+                "..bbbbbbbbbbbb..",
+                "................",
+                "................"
+            ],
+            // ポーション
+            potion: [
+                "......rrrr......",
+                "....rrrrrrrr....",
+                "...rrrrwwwrrr...",
+                "..rrrrwwwwwrrr..",
+                "..rrrrwwwwwrrrr.",
+                "..rrrrwwwwwrrrr.",
+                "..rrrrrrrrrrrrr.",
+                "...ssssssssss...",
+                "...s##s##s##s...",
+                "...ssssssssss...",
+                "....ssssssss....",
+                "....ssssssss....",
+                "................",
+                "................",
+                "................",
+                "................"
+            ],
+            // エフェクト
+            effect: [
+                "w..............w",
+                ".w............w.",
+                "..w..........w..",
+                "...w........w...",
+                "....w..w...w....",
+                ".....w.w.ww.....",
+                "......wwww......",
+                "......wwww......",
+                "......w..w......",
+                ".....w....w.....",
+                "....w......w....",
+                "...w........w...",
+                "..w..........w..",
+                ".w............w.",
+                "w..............w",
+                "................"
+            ]
+        };
+
+        const FONT = {
+            '0': ["01110","10001","10001","10001","01110"],
+            '1': ["00100","01100","00100","00100","01110"],
+            '2': ["01110","10001","00010","00100","11111"],
+            '3': ["01110","10001","00110","10001","01110"],
+            '4': ["00100","01100","10100","11111","00100"],
+            '5': ["11111","10000","11110","00001","11110"],
+            '6': ["01110","10000","11110","10001","01110"],
+            '7': ["11111","00010","00100","01000","10000"],
+            '8': ["01110","10001","01110","10001","01110"],
+            '9': ["01110","10001","01111","00001","01110"],
+            'L': ["10000","10000","10000","10000","11111"],
+            'V': ["10001","10001","10001","01010","00100"],
+            'H': ["10001","10001","11111","10001","10001"],
+            'P': ["11110","10001","11110","10000","10000"],
+            'G': ["01110","10000","10110","10001","01110"], 
+            'A': ["01110","10001","11111","10001","10001"], 
+            'M': ["10001","11011","10101","10001","10001"], 
+            'E': ["11111","10000","11110","10000","11111"], 
+            'O': ["01110","10001","10001","10001","01110"], 
+            'R': ["11110","10001","11110","10100","10001"], 
+            'S': ["01110","10000","01110","00001","01110"], 
+            'C': ["01110","10000","10000","10000","01110"], 
+            'W': ["10001","10001","10101","11011","10001"], 
+            'D': ["11110","10001","10001","10001","11110"],
+            ':': ["00000","00100","00000","00100","00000"],
+            '/': ["00001","00010","00100","01000","10000"],
+            ' ': ["00000","00000","00000","00000","00000"]
+        };
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'step') {
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(80, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.05);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'hit') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.05);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'kill') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'levelup') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(900, now);
+                osc.frequency.setValueAtTime(1200, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.setValueAtTime(0.1, now + 0.08);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            }
+        }
+
+        let gameState = {
+            // directionを追加: 'right' (初期は右向き/提供画像の向き)
+            player: { x: 2, y: 2, hp: 3, maxHp: 3, level: 1, xp: 0, direction: 'right' }, 
+            enemies: [],
+            items: [],
+            map: [],
+            level: 1,
+            isGameOver: false,
+            effects: []
+        };
+
+        const spriteCache = {};
+
+        function parseSprite(key) {
+            if (spriteCache[key]) return spriteCache[key];
+            const raw = SPRITES[key] || SPRITES.wall;
+            
+            // rawが既に2次元配列で、中身が色コード(文字列orNull)の場合はそのまま使う
+            if (Array.isArray(raw[0]) && (raw[0][0] === null || typeof raw[0][0] === 'string')) {
+                spriteCache[key] = raw;
+                return raw;
+            }
+
+            const parsed = [];
+            for (let r = 0; r < 16; r++) {
+                let rowStr = raw[r];
+                let rowData = [];
+                for (let c = 0; c < rowStr.length; c++) {
+                    let char = rowStr[c];
+                    rowData.push(CHAR_MAP[char] || null);
+                }
+                parsed.push(rowData);
+            }
+            spriteCache[key] = parsed;
+            return parsed;
+        }
+
+        function drawChar(ctx, char, x, y, color) {
+            const data = FONT[char] || FONT[' '];
+            const size = 3; 
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    if (data[r][c] === '1') {
+                        ctx.fillRect(x + c * size + 3, y + r * size + 3, size, size);
+                    }
+                }
+            }
+
+            ctx.fillStyle = color;
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    if (data[r][c] === '1') {
+                        ctx.fillRect(x + c * size, y + r * size, size, size);
+                    }
+                }
+            }
+            return 6 * size; 
+        }
+
+        function drawText(ctx, text, x, y, color = COLORS.White) {
+            let cx = x;
+            text = text.toUpperCase();
+            for (let i = 0; i < text.length; i++) {
+                cx += drawChar(ctx, text[i], cx, y, color);
+            }
+        }
+
+        function drawParsedSprite(ctx, key, x, y) {
+            const bitmap = parseSprite(key);
+            for (let r = 0; r < 16; r++) {
+                for (let c = 0; c < 16; c++) {
+                    const color = bitmap[r][c];
+                    if (color) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x + c, y + r, 1, 1);
+                    }
+                }
+            }
+        }
+
+        function generateMap() {
+            let map = [];
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                let row = [];
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    // 外枠（端の1マス）を壁(1)にする
+                    if (x === 0 || x === MAP_WIDTH - 1 || y === 0 || y === MAP_HEIGHT - 1) {
+                        row.push(1); 
+                    } else {
+                        // 内部生成ロジック
+                        row.push(Math.random() < 0.1 ? 1 : 0); 
+                    }
+                }
+                map.push(row);
+            }
+            
+            for(let y=2; y<5; y++) for(let x=2; x<5; x++) map[y][x] = 0;
+
+            map[MAP_HEIGHT-4][MAP_WIDTH-4] = 2; // 階段
+            gameState.map = map;
+            
+            gameState.enemies = [];
+            gameState.items = [];
+            
+            let enemyCount = 4 + gameState.level;
+            for (let i = 0; i < enemyCount; i++) {
+                let ex, ey;
+                do {
+                    ex = Math.floor(Math.random() * (MAP_WIDTH - 4)) + 2;
+                    ey = Math.floor(Math.random() * (MAP_HEIGHT - 4)) + 2;
+                } while (map[ey][ex] !== 0 || (ex < 6 && ey < 6));
+                
+                gameState.enemies.push({
+                    x: ex, y: ey, 
+                    hp: 1, 
+                    maxHp: 1
+                });
+            }
+
+            if (Math.random() > 0.4) {
+                let px, py;
+                do {
+                    px = Math.floor(Math.random() * (MAP_WIDTH - 4)) + 2;
+                    py = Math.floor(Math.random() * (MAP_HEIGHT - 4)) + 2;
+                } while (map[py][px] !== 0);
+                gameState.items.push({x: px, y: py, type: 'potion'});
+            }
+        }
+
+        function processTurn(dx, dy) {
+            if (gameState.isGameOver) {
+                initGame();
+                return;
+            }
+            
+            // 方向転換
+            if (dx > 0) gameState.player.direction = 'right';
+            if (dx < 0) gameState.player.direction = 'left';
+
+            const targetX = gameState.player.x + dx;
+            const targetY = gameState.player.y + dy;
+
+            if (gameState.map[targetY][targetX] === 1 || gameState.map[targetY][targetX] === 9) return;
+
+            let enemyIndex = gameState.enemies.findIndex(e => e.x === targetX && e.y === targetY);
+            if (enemyIndex !== -1) {
+                const enemy = gameState.enemies[enemyIndex];
+                enemy.hp = 0;
+                playSound('kill');
+                addEffect(targetX, targetY);
+                gameState.enemies.splice(enemyIndex, 1);
+                gameState.player.xp += 100;
+            } else {
+                gameState.player.x = targetX;
+                gameState.player.y = targetY;
+                playSound('step');
+
+                let itemIndex = gameState.items.findIndex(i => i.x === targetX && i.y === targetY);
+                if (itemIndex !== -1) {
+                    const item = gameState.items[itemIndex];
+                    if (item.type === 'potion') {
+                        gameState.player.hp = Math.min(gameState.player.hp + 1, gameState.player.maxHp);
+                        playSound('levelup');
+                        gameState.items.splice(itemIndex, 1);
+                    }
+                }
+
+                if (gameState.map[targetY][targetX] === 2) {
+                    gameState.level++;
+                    playSound('levelup');
+                    gameState.player.x = 2;
+                    gameState.player.y = 2;
+                    generateMap();
+                    return;
+                }
+            }
+
+            moveEnemies();
+        }
+
+        function moveEnemies() {
+            gameState.enemies.forEach(enemy => {
+                const dx = gameState.player.x - enemy.x;
+                const dy = gameState.player.y - enemy.y;
+                
+                if (Math.abs(dx) + Math.abs(dy) === 1) {
+                    gameState.player.hp -= 1;
+                    playSound('hit');
+                    addEffect(gameState.player.x, gameState.player.y);
+                    if (gameState.player.hp <= 0) {
+                        gameState.player.hp = 0;
+                        gameState.isGameOver = true;
+                    }
+                } else {
+                    if(Math.random() < 0.5) return;
+
+                    let moveX = dx !== 0 ? Math.sign(dx) : 0;
+                    let moveY = dy !== 0 ? Math.sign(dy) : 0;
+                    if (moveX !== 0 && moveY !== 0) {
+                        if (Math.random() < 0.5) moveX = 0; else moveY = 0;
+                    }
+                    const nextX = enemy.x + moveX;
+                    const nextY = enemy.y + moveY;
+
+                    if (gameState.map[nextY][nextX] !== 1 && gameState.map[nextY][nextX] !== 9 &&
+                        !gameState.enemies.some(e => e.x === nextX && e.y === nextY) &&
+                        !(nextX === gameState.player.x && nextY === gameState.player.y)) {
+                        enemy.x = nextX;
+                        enemy.y = nextY;
+                    }
+                }
+            });
+        }
+
+        function addEffect(x, y) {
+            gameState.effects.push({x: x, y: y, timer: 5});
+        }
+
+        function initGame() {
+            gameState.player = { x: 2, y: 2, hp: 3, maxHp: 3, level: 1, xp: 0, direction: 'right' };
+            gameState.level = 1;
+            gameState.isGameOver = false;
+            gameState.effects = [];
+            generateMap();
+            requestAnimationFrame(draw);
+        }
+
+        function draw() {
+            let camX = (gameState.player.x * TILE_SIZE * ZOOM) - (canvas.width / 2) + (TILE_SIZE * ZOOM / 2);
+            let camY = (gameState.player.y * TILE_SIZE * ZOOM) - (canvas.height / 2) + (TILE_SIZE * ZOOM / 2);
+
+            camX = Math.max(0, Math.min(camX, (MAP_WIDTH * TILE_SIZE * ZOOM) - canvas.width));
+            camY = Math.max(0, Math.min(camY, (MAP_HEIGHT * TILE_SIZE * ZOOM) - canvas.height));
+
+            // 背景クリア
+            ctx.fillStyle = COLORS.SkyBlue; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // --- カメラ適用開始 ---
+            ctx.save();
+            ctx.translate(-Math.floor(camX), -Math.floor(camY));
+            ctx.scale(ZOOM, ZOOM);
+
+            // プレイエリア描画
+            // 修正: 端（x=0, y=0, x=MAX, y=MAX）も含めて描画するようループ範囲を変更
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    const tile = gameState.map[y][x];
+                    const px = x * TILE_SIZE;
+                    const py = y * TILE_SIZE;
+                    
+                    // ベース床
+                    drawParsedSprite(ctx, 'floor', px, py);
+
+                    if (tile === 1) {
+                        drawParsedSprite(ctx, 'wall', px, py);
+                    } else if (tile === 2) {
+                        drawParsedSprite(ctx, 'stairs', px, py);
+                    }
+                }
+            }
+
+            gameState.items.forEach(item => {
+                drawParsedSprite(ctx, item.type, item.x * TILE_SIZE, item.y * TILE_SIZE);
+            });
+
+            gameState.enemies.forEach(enemy => {
+                drawParsedSprite(ctx, 'enemy', enemy.x * TILE_SIZE, enemy.y * TILE_SIZE);
+            });
+
+            if (!gameState.isGameOver) {
+                // プレイヤーの向きによって描画を変える
+                const px = gameState.player.x * TILE_SIZE;
+                const py = gameState.player.y * TILE_SIZE;
+                
+                if (gameState.player.direction === 'right') {
+                    // 右向き: 水平反転して描画（元絵は手が左なので、右に向けるために反転）
+                    ctx.save();
+                    ctx.translate(px + TILE_SIZE, py);
+                    ctx.scale(-1, 1);
+                    drawParsedSprite(ctx, 'player', 0, 0);
+                    ctx.restore();
+                } else {
+                    // 左向き: そのまま描画（元絵通り手が左）
+                    drawParsedSprite(ctx, 'player', px, py);
+                }
+            }
+
+            gameState.effects = gameState.effects.filter(e => e.timer > 0);
+            gameState.effects.forEach(e => {
+                drawParsedSprite(ctx, 'effect', e.x * TILE_SIZE, e.y * TILE_SIZE);
+                e.timer--;
+            });
+
+            // --- カメラ適用終了 ---
+            ctx.restore();
+
+            // --- UIレイヤー（画面固定、枠なし） ---
+            
+            // ステータス背景
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(0, 0, canvas.width, 40);
+
+            // テキスト情報
+            drawText(ctx, "FLOOR " + gameState.level, 20, 10, COLORS.Gold);
+            drawText(ctx, "HP:" + gameState.player.hp, 200, 10, COLORS.White);
+            drawText(ctx, "XP:" + gameState.player.xp, 350, 10, COLORS.White);
+
+            if (gameState.isGameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width / 2 - 80;
+                const cy = canvas.height / 2 - 20;
+                drawText(ctx, "GAME OVER", cx, cy, COLORS.Red);
+                drawText(ctx, "TRY AGAIN", cx + 10, cy + 40, COLORS.White);
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (gameState.isGameOver) {
+                if (e.code === 'Space') initGame();
+                return;
+            }
+            switch(e.key) {
+                case 'ArrowUp': processTurn(0, -1); break;
+                case 'ArrowDown': processTurn(0, 1); break;
+                case 'ArrowLeft': processTurn(-1, 0); break;
+                case 'ArrowRight': processTurn(1, 0); break;
+                case ' ': processTurn(0, 0); break;
+            }
+        });
+
+        const directions = {
+            'btn-up': [0, -1],
+            'btn-down': [0, 1],
+            'btn-left': [-1, 0],
+            'btn-right': [1, 0]
+        };
+        Object.keys(directions).forEach(id => {
+            const btn = document.getElementById(id);
+            const handler = (e) => {
+                e.preventDefault();
+                processTurn(...directions[id]);
+            };
+            btn.addEventListener('touchstart', handler);
+            btn.addEventListener('mousedown', handler);
+        });
+        const actionBtn = document.getElementById('btn-action');
+        const actionHandler = (e) => {
+            e.preventDefault();
+            if (gameState.isGameOver) initGame(); else processTurn(0, 0);
+        };
+        actionBtn.addEventListener('touchstart', actionHandler);
+        actionBtn.addEventListener('mousedown', actionHandler);
+
+        initGame();
+
+    </script>
+</body>
+</html>
