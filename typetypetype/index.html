@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TypeTypeType - The Typing Battle</title>
+    <title>TypeTypeType - Universal Matrix V41</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -354,7 +354,7 @@
     <!-- 接続ステータス -->
     <div id="connection-status">
         <div class="status-dot"></div>
-        <span id="status-text">CONNECTING...</span>
+        <span id="status-text">OFFLINE</span>
     </div>
 
     <!-- 背景 -->
@@ -384,7 +384,7 @@
         
         <button onclick="prepareStart()" class="group relative px-36 py-14 border-4 border-cyan-500 transition-all hover:bg-cyan-500 hover:text-black active:scale-95">
             <span class="text-6xl font-black uppercase tracking-widest text-cyan-400 group-hover:text-black">PLAY</span>
-            <div class="absolute -bottom-12 left-0 w-full text-[11px] text-gray-600 uppercase tracking-widest opacity-50 italic">Ranked Mode / Social Share Ready.</div>
+            <div class="absolute -bottom-12 left-0 w-full text-[11px] text-gray-600 uppercase tracking-widest opacity-50 italic">Ranked Mode / Universal Stroke Engine.</div>
         </button>
     </div>
 
@@ -493,16 +493,19 @@
         import { getFirestore, collection, addDoc, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
         import { getAnalytics } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js';
 
-        // ユーザーが提供したConfig
+        // -------------------------------------------------------------
+        // ↓↓↓ 公開時はここに自分のConfigを貼り付けてください ↓↓↓
+        // -------------------------------------------------------------
         const firebaseConfig = {
-            apiKey: "AIzaSyA7tro4FihyNpo14XrYIA2E79_sN42fa98",
-            authDomain: "typetypetype-ca003.firebaseapp.com",
-            projectId: "typetypetype-ca003",
-            storageBucket: "typetypetype-ca003.firebasestorage.app",
-            messagingSenderId: "312026487270",
-            appId: "1:312026487270:web:43e345dd50bd115f17de27",
-            measurementId: "G-69GQ0S72RP"
+             apiKey: "AIzaSyA7tro4FihyNpo14XrYIA2E79_sN42fa98",
+             authDomain: "typetypetype-ca003.firebaseapp.com",
+             projectId: "typetypetype-ca003",
+             storageBucket: "typetypetype-ca003.firebasestorage.app",
+             messagingSenderId: "312026487270",
+             appId: "1:312026487270:web:43e345dd50bd115f17de27",
+             measurementId: "G-69GQ0S72RP"
         };
+        // -------------------------------------------------------------
         
         let db;
         let auth;
@@ -545,6 +548,7 @@
             btn.innerText = "SENDING...";
 
             try {
+                // コレクション名を 'leaderboard' に統一
                 await addDoc(collection(db, 'leaderboard'), {
                     name: name,
                     score: finalScore,
@@ -918,17 +922,17 @@
         const ROMAJI_TABLE = {
             'あ':["a"],'い':["i"],'う':["u","wu"],'え':["e"],'お':["o"],
             'か':["ka","ca"],'き':["ki"],'く':["ku","qu","cu"],'け':["ke"],'こ':["ko","co"],
-            'さ':["sa"],'し':["shi","si"],'す':["su"],'せ':["se"],'そ':["so"],
+            'さ':["sa"],'し':["shi","si","ci"],'す':["su"],'せ':["se","ce"],'そ':["so"],
             'た':["ta"],'ち':["chi","ti"],'つ':["tsu","tu"],'て':["te"],'と':["to"],
-            'な':["na"],'に':["ni"],'ぬ':["nu"],'ね':["ne"],'の':["no"],
+            'な':["na"],'ni':["ni"],'ぬ':["nu"],'ね':["ne"],'の':["no"],
             'は':["ha"],'ひ':["hi"],'ふ':["fu","hu"],'へ':["he"],'ほ':["ho"],
             'ま':["ma"],'み':["mi"],'む':["mu"],'め':["me"],'も':["mo"],
             'や':["ya"],'ゆ':["yu"],'よ':["yo"],
             'ら':["ra"],'り':["ri"],'る':["ru"],'れ':["re"],'ろ':["ro"],
-            'わ':["wa"],'を':["wo"],'ん':["nn","n"],
+            'わ':["wa"],'を':["wo"],'ん':["nn","n","xn"],
             'が':["ga"],'ぎ':["gi"],'ぐ':["gu"],'げ':["ge"],'ご':["go"],
             'ざ':["za"],'じ':["ji","zi"],'ず':["zu"],'ぜ':["ze"],'ぞ':["zo"],
-            'だ':["da"],'ぢ':["di"],'づ':["du"],'で':["de"],'ど':["do"],
+            'だ':["da"],'ぢ':["di","ji"],'づ':["du","zu"],'で':["de"],'ど':["do"],
             'ば':["ba"],'び':["bi"],'ぶ':["bu"],'べ':["be"],'ぼ':["bo"],
             'ぱ':["pa"],'ぴ':["pi"],'ぷ':["pu"],'ぺ':["pe"],'ぽ':["po"],
             'きゃ':["kya"],'きゅ':["kyu"],'きょ':["kyo"],
@@ -939,7 +943,7 @@
             'みゃ':["mya"],'みゅ':["myu"],'みょ':["myo"],
             'りゃ':["rya"],'りゅ':["ryu"],'りょ':["ryo"],
             'ぎゃ':["gya"],'ぎゅ':["gyu"],'ぎょ':["gyo"],
-            'じゃ':["ja","zya"],'じゅ':["ju","zyu"],'じょ':["jo","zyo"],
+            'じゃ':["ja","zya","jya"],'じゅ':["ju","zyu","jyu"],'じょ':["jo","zyo","jyo"],
             'びゃ':["bya"],'びゅ':["byu"],'びょ':["byo"],
             'ぴゃ':["pya"],'ぴゅ':["pyu"],'ぴょ':["pyo"],
             'ふぁ':["fa"],'ふぃ':["fi"],'ふぇ':["fe"],'ふぉ':["fo"],
@@ -947,7 +951,7 @@
             'つぁ':["tsa"],'つぃ':["tsi"],'つぇ':["tse"],'つぉ':["tso"],
             'うぃ':["wi"],'うぇ':["we"],'うぉ':["wo"],'う゛':["vu"],
             'ゔぁ':["va"],'ゔぃ':["vi"],'ゔぇ':["ve"],'ゔぉ':["vo"],
-            'しぇ':["she"],'ちぇ':["che"],'じぇ':["je"],
+            'しぇ':["she","sye"],'ちぇ':["che","tye"],'じぇ':["je","zye","jye"],
             'ぁ':["xa","la"],'ぃ':["xi","li"],'ぅ':["xu","lu"],'ぇ':["xe","le"],'ぉ':["xo","lo"],
             'っ':["xtsu","ltu","xtu"],'ゃ':["xya","lya"],'ゅ':["xyu","lyu"],'ょ':["xyo","lyo"],
             'ー':["-"],'、':[","],'。':["."],'！':["!"],'？':["?"]
@@ -1042,6 +1046,7 @@
             if (strokeHistory.length > 15) strokeHistory.shift();
             totalStrokes++;
 
+            // ミスロック中
             if (errorBuffer.length > 0) {
                 errorBuffer += key;
                 score -= 2;
@@ -1053,6 +1058,7 @@
                 return;
             }
 
+            // 「ん」救済（空打ち）
             if (key === 'n' && inputBuffer === "" && isNCommitted) {
                 const remaining = cleanReading.slice(typedText.length);
                 let nextIsN = false;
@@ -1132,6 +1138,9 @@
         }
 
         function checkMatchLogic(buf, remaining) {
+            // 総当たりチェック
+            
+            // 1. 促音ショートカット
             if (remaining.startsWith('っ') && buf.length >= 1) {
                 const nextChar = remaining[1];
                 if (nextChar && !['あ','い','う','え','お','ん','な','に','ぬ','ね','の'].includes(nextChar)) {
@@ -1146,29 +1155,29 @@
                 }
             }
 
+            // 2. 2文字 (拗音) 優先
+            let match2 = null;
             if (remaining.length >= 2) {
                 const two = remaining.slice(0, 2);
                 const candidates = ROMAJI_TABLE[two];
                 if (candidates) {
                     const m = candidates.find(c => buf === c);
-                    if (m) { 
-                        typedText += two; 
-                        inputBuffer = ""; 
-                        handleSuccess(); 
-                        return 'match'; 
-                    }
-                    if (candidates.some(c => c.startsWith(buf))) return 'possible';
+                    if (m) match2 = 'match';
+                    else if (candidates.some(c => c.startsWith(buf))) match2 = 'possible';
                 }
             }
 
+            // 3. 1文字
+            let match1 = null;
             const one = remaining[0];
-            const candidates = ROMAJI_TABLE[one];
-            if (candidates) {
+            const candidates1 = ROMAJI_TABLE[one];
+            if (candidates1) {
+                // 「ん」判定
                 if (one === 'ん') {
-                    if (buf === 'nn') { 
-                        typedText += 'ん'; inputBuffer = ""; handleSuccess(); return 'match'; 
+                    if (buf === 'nn') {
+                         typedText += 'ん'; inputBuffer = ""; handleSuccess(); return 'match'; 
                     }
-                    if (buf === 'n') {
+                    if (buf === 'n' || buf === 'xn') {
                         const next = remaining[1];
                         if (!next) { 
                             typedText += 'ん'; inputBuffer = ""; isNCommitted = true; handleSuccess(); return 'match'; 
@@ -1177,16 +1186,26 @@
                         if (!['a','i','u','e','o','n','y'].includes(nextFirstChar)) {
                              typedText += 'ん'; inputBuffer = ""; isNCommitted = true; handleSuccess(); return 'match';
                         }
-                        return 'possible';
+                        match1 = 'possible';
                     }
+                } else {
+                    const m = candidates1.find(c => buf === c);
+                    if (m) match1 = 'match';
+                    else if (candidates1.some(c => c.startsWith(buf))) match1 = 'possible';
                 }
-
-                const m = candidates.find(c => buf === c);
-                if (m) { 
-                    typedText += one; inputBuffer = ""; handleSuccess(); return 'match'; 
-                }
-                if (candidates.some(c => c.startsWith(buf))) return 'possible';
             }
+
+            // 優先順位: 2文字Match > 1文字Match > 2文字Possible > 1文字Possible
+            // 2文字マッチしたら確定
+            if (match2 === 'match') {
+                typedText += remaining.slice(0, 2); inputBuffer = ""; handleSuccess(); return 'match';
+            }
+            // 1文字マッチ
+            if (match1 === 'match') {
+                typedText += remaining[0]; inputBuffer = ""; handleSuccess(); return 'match';
+            }
+            // 両方possibleならpossible
+            if (match2 === 'possible' || match1 === 'possible') return 'possible';
 
             return 'miss';
         }
@@ -1248,13 +1267,25 @@
                     let historyHtml = '<div id="stroke-history-conveyor">';
                     strokeHistory.forEach(s => { historyHtml += `<span class="stroke-particle">${s}</span>`; });
                     historyHtml += '</div>';
-                    const bufHtml = `<div class="keystroke-display-wrapper"><span class="buffer-correct">${inputBuffer}</span><span class="buffer-error">${errorBuffer}</span><span class="mini-cursor"></span></div>`;
+                    
+                    const bufHtml = `<div class="keystroke-display-wrapper">
+                        <span class="buffer-correct">${inputBuffer}</span>
+                        <span class="buffer-error">${errorBuffer}</span>
+                        <span class="mini-cursor"></span>
+                    </div>`;
+                    
                     html += `<div style="position:relative; display:inline-block;">${bufHtml}${historyHtml}<span id="cursor-pos" class="typing-cursor"></span></div>`;
                 }
+                
                 html += `<span id="char-${i}" class="char-unit ${isTyped ? 'text-white bloom-cyan' : 'opacity-[0.15]'}">${char}</span>`;
             }
-            if (typedText.length >= cleanReading.length) html += `<span id="cursor-pos" class="typing-cursor"></span>`;
+            
+            if (typedText.length >= cleanReading.length) {
+                 html += `<span id="cursor-pos" class="typing-cursor"></span>`;
+            }
+
             readingRail.innerHTML = html;
+
             const cursorEl = document.getElementById('cursor-pos');
             if (cursorEl) {
                 const offset = cursorEl.parentElement.offsetLeft + (cursorEl.parentElement.offsetWidth / 2);
@@ -1324,6 +1355,7 @@
             document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 95%, 8%) 0%, var(--bg-black) 100%)`;
 
             const kpm = Math.floor(totalStrokes / (elapsedTotal / 60)) || 0;
+            
             if (isGameActive) {
                 bossRotation += (kpm / 250) + 1;
                 bossSvg.style.transform = `rotate(${bossRotation}deg)`;
